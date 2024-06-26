@@ -100,12 +100,17 @@ class _HomePageState extends State<HomePage> {
       
 
       try {
-        ridesCreated = await supabase.from('rides').insert({
+        var response = await supabase.from('rides').insert({
           'user_id': supabase.auth.currentUser?.id,
           'price': selectedTariff,
           'start_at': DateTime.now().toUtc().toIso8601String(),
           'start_location': 'POINT(${startPosition.latitude} ${startPosition.longitude})',
         }).select();
+
+        setState(() {
+          ridesCreated = response;
+        });
+
         print('Response: $ridesCreated');
       } catch (e) {
         print('Error inserting ride: $e');
@@ -113,9 +118,9 @@ class _HomePageState extends State<HomePage> {
     }
   }
 
-  void _endRide(int rideId) async {
+  void _endRide() async {
     positionStream?.cancel();
-
+    Position endPosition = await Geolocator.getCurrentPosition();
     // print('RidesCreated: $ridesCreated');
     double distance = 0.0;
     for (int i = 1; i < positions.length; i++) {
@@ -127,13 +132,13 @@ class _HomePageState extends State<HomePage> {
       );
     }
     try {
-      print('rideStarted $ridesCreated');
+      print('ridesCreated $ridesCreated ${ridesCreated[0]['id']}');
       await supabase.from('rides').update({
         'end_at': DateTime.now().toUtc().toIso8601String(),
-        'end_location': 'POINT(${positions.last.latitude} ${positions.last.longitude})',
+        'end_location': 'POINT(${endPosition.latitude} ${endPosition.longitude})',
         'distance': distance,
         'price': selectedTariff,
-      }).eq('id',rideId);
+      }).eq('id', ridesCreated[0]['id']);
     } catch (e) {
       print('Error updating ride: $e');
     }
@@ -314,9 +319,7 @@ class _HomePageState extends State<HomePage> {
             foregroundColor: Colors.white,
             padding: EdgeInsets.symmetric(horizontal: 24, vertical: 12),
           ),
-          onPressed: () {
-             _endRide(ridesCreated[0]['id']);
-          },
+          onPressed: _endRide,
           child: Text(
             'Terminer la course',
             style: TextStyle(
