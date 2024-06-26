@@ -25,6 +25,9 @@ create table
     constraint rides_user_id_fkey foreign key (user_id) references auth.users (id) on update cascade on delete set default
   ) tablespace pg_default;
 */
+/*
+Response: [{id: 6, created_at: 2024-06-26T10:06:45.843876+00:00, user_id: d35b5904-99e4-4153-82c9-483090908558, start_at: 2024-06-26T10:06:44.539031+00:00, end_at: null, start_location: 0101000020E61000005062218491714040BD74EED1769F1BC0, end_location: null, price: 400, distance: null}]
+*/
 
 class MyApp extends StatelessWidget {
   @override
@@ -43,10 +46,13 @@ class HomePage extends StatefulWidget {
 class _HomePageState extends State<HomePage> {
   final SupabaseClient supabase = Supabase.instance.client;
   int selectedTariff = 0;
-  int totalSum = 0;
+  var totalSum = 0.0;
   bool rideStarted = false;
   List<Position> positions = [];
-  StreamSubscription<Position>? positionStream;
+  List<Map<String, dynamic>> ridesCreated = [];
+
+
+  // StreamSubscription<Position>? positionStream;
 
   void _selectTariff(int tariff) {
     setState(() {
@@ -75,40 +81,32 @@ class _HomePageState extends State<HomePage> {
         // Permissions are permanently denied, do something here.
         return;
       }
+      Position startPosition = await Geolocator.getCurrentPosition();
+
 
       setState(() {
         totalSum += selectedTariff;
         rideStarted = true;
         positions.clear(); // Clear previous positions
       });
-
-      positionStream = Geolocator.getPositionStream().listen((Position position) {
-        setState(() {
-          positions.add(position);
-        });
-      });
       try {
-        await supabase.from('rides').insert({
+        ridesCreated = await supabase.from('rides').insert({
           'user_id': supabase.auth.currentUser?.id,
           'price': selectedTariff,
-          'start_at': DateTime.now(),
-          'start_location': 'POINT(${positions[0].longitude} ${positions[0].latitude})',
-        });
+          'start_at': DateTime.now().toUtc().toIso8601String(),
+          'start_location': 'POINT(${startPosition.latitude} ${startPosition.longitude})',
+        }).select();
+        print('Response: $ridesCreated');
       } catch (e) {
         print('Error inserting ride: $e');
       }
-      supabase.from('rides').insert({
-        'user_id': supabase.auth.currentUser?.id,
-        'price': selectedTariff,
-        'start_at': DateTime.now(),
-        'start_location': 'POINT(${positions[0].longitude} ${positions[0].latitude})',
-      });
     }
   }
 
-  void _endRide() {
+  void _endRide(int rideId) async {
     positionStream?.cancel();
 
+    // print('RidesCreated: $ridesCreated');
     double distance = 0.0;
     for (int i = 1; i < positions.length; i++) {
       distance += Geolocator.distanceBetween(
@@ -117,6 +115,18 @@ class _HomePageState extends State<HomePage> {
         positions[i].latitude,
         positions[i].longitude,
       );
+    }
+    try {
+      print('rideStarted $ridesCreated');
+      await supabase.from('rides').update({
+        'end_at': DateTime.now().toUtc().toIso8601String(),
+        'end_location': 'POINT(${positions.last.latitude} ${positions.last.longitude})',
+        'distance': distance,
+        // 'price': selectedTariff + distance / 1000 * 100 // 100 XOF per km
+        'price': selectedTariff,
+      }).eq('id',rideId);
+    } catch (e) {
+      print('Error updating ride: $e');
     }
 
     setState(() {
@@ -142,6 +152,53 @@ class _HomePageState extends State<HomePage> {
         );
       },
     );
+  }
+
+  void _fetchDailyIncome() async {
+    DateTime now = DateTime.now();
+    DateTime startOfToday = DateTime(now.year, now.month, now.day);
+    try {
+      final response = await supabase.from('rides')
+        .select('price')
+        .eq('user_id', supabase.auth.currentUser!.id)
+        .gte('end_at', startOfToday.toUtc().toIso8601String());
+
+      double sum = 0;
+      for (var ride in response) {
+        sum += ride['price'];
+      }
+      setState(() {
+        totalSum = sum;
+      });
+      print('Response: $response');
+    } catch (e) {
+      print('Error fetching daily income: $e');
+    }
+  }
+
+  StreamSubscription<Position>? positionStream;
+  
+  @override
+  void initState() {
+    super.initState();
+    positionStream = Geolocator.getPositionStream().listen((Position position) {
+      setState(() {
+        positions.add(position);
+
+        if (positions.isNotEmpty) {
+          print('POINT(${positions[0].latitude} ${positions[0].longitude})');
+          //positions.clear();
+        }
+      });
+    });
+    _fetchDailyIncome();
+
+  }
+
+  @override
+  void dispose() {
+    positionStream?.cancel();
+    super.dispose();
   }
 
   @override
@@ -247,7 +304,9 @@ class _HomePageState extends State<HomePage> {
             foregroundColor: Colors.white,
             padding: EdgeInsets.symmetric(horizontal: 24, vertical: 12),
           ),
-          onPressed: _endRide,
+          onPressed: () {
+             _endRide(ridesCreated[0]['id']);
+          },
           child: Text(
             'Terminer la course',
             style: TextStyle(
