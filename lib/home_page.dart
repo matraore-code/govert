@@ -61,9 +61,12 @@ class _HomePageState extends State<HomePage> {
   }
 
   void _startRide() async {
+    print('Moctar');
+
     if (selectedTariff != 0) {
       bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
       if (!serviceEnabled) {
+        print('Location services are disabled');
         // Location services are not enabled, do something here.
         return;
       }
@@ -73,22 +76,29 @@ class _HomePageState extends State<HomePage> {
         permission = await Geolocator.requestPermission();
         if (permission == LocationPermission.denied) {
           // Permissions are denied, do something here.
+          print('Location services are disabled');
+
           return;
         }
       }
 
       if (permission == LocationPermission.deniedForever) {
         // Permissions are permanently denied, do something here.
+                print('Location services are disabled');
+
         return;
       }
+      print(rideStarted);
+
       Position startPosition = await Geolocator.getCurrentPosition();
 
 
       setState(() {
-        totalSum += selectedTariff;
         rideStarted = true;
         positions.clear(); // Clear previous positions
       });
+      
+
       try {
         ridesCreated = await supabase.from('rides').insert({
           'user_id': supabase.auth.currentUser?.id,
@@ -122,7 +132,6 @@ class _HomePageState extends State<HomePage> {
         'end_at': DateTime.now().toUtc().toIso8601String(),
         'end_location': 'POINT(${positions.last.latitude} ${positions.last.longitude})',
         'distance': distance,
-        // 'price': selectedTariff + distance / 1000 * 100 // 100 XOF per km
         'price': selectedTariff,
       }).eq('id',rideId);
     } catch (e) {
@@ -212,6 +221,7 @@ class _HomePageState extends State<HomePage> {
                 fontSize: 40,
                 fontWeight: FontWeight.bold)),
         backgroundColor: Colors.black,
+        centerTitle: true,
       ),
       body: Center(
         child: rideStarted ? _buildRideInProgress() : _buildTariffSelection(),

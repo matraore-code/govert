@@ -16,7 +16,7 @@ class SplashScreen extends StatelessWidget {
       nextScreen: CheckUserLoggedInOrNot(),
       splashTransition: SplashTransition.scaleTransition,
       pageTransitionType: PageTransitionType.rightToLeftWithFade,
-      backgroundColor: Colors.green,
+      backgroundColor: Colors.black,
     );
   }
 }
