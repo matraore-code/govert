@@ -50,6 +50,7 @@ class _HomePageState extends State<HomePage> {
   bool rideStarted = false;
   List<Position> positions = [];
   List<Map<String, dynamic>> ridesCreated = [];
+  StreamSubscription<Position>? positionStream;
 
 
   // StreamSubscription<Position>? positionStream;
@@ -63,6 +64,7 @@ class _HomePageState extends State<HomePage> {
   void _startRide() async {
     print('Moctar');
 
+    positionStream?.cancel();
     if (selectedTariff != 0) {
       bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
       if (!serviceEnabled) {
@@ -109,6 +111,7 @@ class _HomePageState extends State<HomePage> {
 
         setState(() {
           ridesCreated = response;
+          positionStream?.resume();
         });
 
         print('Response: $ridesCreated');
@@ -119,10 +122,15 @@ class _HomePageState extends State<HomePage> {
   }
 
   void _endRide() async {
-    positionStream?.cancel();
     Position endPosition = await Geolocator.getCurrentPosition();
     // print('RidesCreated: $ridesCreated');
     double distance = 0.0;
+    int price = selectedTariff;
+    setState(() {
+        rideStarted = false;
+        selectedTariff = 0;
+        positionStream?.cancel();
+    });
     for (int i = 1; i < positions.length; i++) {
       distance += Geolocator.distanceBetween(
         positions[i - 1].latitude,
@@ -137,16 +145,11 @@ class _HomePageState extends State<HomePage> {
         'end_at': DateTime.now().toUtc().toIso8601String(),
         'end_location': 'POINT(${endPosition.latitude} ${endPosition.longitude})',
         'distance': distance,
-        'price': selectedTariff,
+        'price': price,
       }).eq('id', ridesCreated[0]['id']);
     } catch (e) {
       print('Error updating ride: $e');
     }
-
-    setState(() {
-      rideStarted = false;
-      selectedTariff = 0; // Reset the selected tariff after ending the ride
-    });
 
     // Show the total distance
     showDialog(
@@ -189,8 +192,6 @@ class _HomePageState extends State<HomePage> {
       print('Error fetching daily income: $e');
     }
   }
-
-  StreamSubscription<Position>? positionStream;
   
   @override
   void initState() {
