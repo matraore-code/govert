@@ -17,12 +17,12 @@ class _LoginPageState extends State<LoginPage> {
 
   void handleSubmit(BuildContext context) async {
     if (_formKey.currentState!.validate()) {
-       AuthResponse? response;
+      AuthResponse? response;
       try {
-          response = await supabase.auth.signInWithPassword(
+        response = await supabase.auth.signInWithPassword(
           email: _identifierController.text,
           password: _passwordController.text,
-      );
+        );
       } catch (e) {
         print(e);
       }

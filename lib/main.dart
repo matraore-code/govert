@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:govert/splash_screen.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-import 'login_page.dart';
-import 'home_page.dart';
+
 
 Future<void> main() async {
   await Supabase.initialize(
@@ -18,11 +18,12 @@ class GovertApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      initialRoute: '/',
-      routes: {
-        '/': (context) => LoginPage(),
-        '/home': (context) => HomePage(),
-      },
+      title: 'GOVERT',
+      theme: ThemeData(
+        colorScheme: ColorScheme.fromSeed(seedColor: Colors.deepOrange),
+        useMaterial3: true,
+      ),
+      home: SplashScreen(), 
     );
   }
 }
